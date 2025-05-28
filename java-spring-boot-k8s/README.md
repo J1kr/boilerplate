@@ -1,8 +1,3 @@
-네, 알겠습니다! 지금까지 진행된 내용과 최종적으로 확인된 설정을 바탕으로 `java-spring-boot-k8s/README.md` 파일의 내용을 다시 한번 정리해 드릴게요. 이번에는 Spring Boot 3.4.0 버전과 OTLP/HTTP 트레이싱 연동이 확인된 현재 상태를 기준으로 작성하겠습니다.
-
----
-
-```markdown
 # 쿠버네티스 환경을 위한 Java Spring Boot 보일러플레이트
 
 ## 1. 개요
