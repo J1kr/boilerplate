@@ -1,0 +1,99 @@
+# src/main/resources/application.yml
+# https://docs.spring.io/spring-boot/3.4/appendix/application-properties/index.html
+
+# Spring Boot 애플리케이션 기본 정보
+spring:
+  application:
+    name: java-spring-boot-k8s # 애플리케이션 이름. ConfigMap/Secret 이름 규칙 등에 활용될 수 있습니다.
+
+  # Spring Boot 2.4+ 부터 사용 가능한 외부 설정 가져오기 기능
+  # "kubernetes:" 네임스페이스를 통해 ConfigMap 및 Secret을 로드합니다.
+  # "optional:"을 앞에 붙이면 해당 ConfigMap/Secret이 없어도 애플리케이션 시작이 가능합니다 (로컬 개발 등).
+  config:
+    import: "optional:kubernetes:"
+
+  # Spring Cloud Kubernetes 관련 설정
+  cloud:
+    kubernetes:
+      # ConfigMap 기반 프로퍼티 소스 활성화 (기본값: true)
+      config:
+        enabled: true
+        # sources: 읽어올 ConfigMap 목록 정의
+        # 애플리케이션 이름과 동일한 이름의 ConfigMap을 현재 Pod의 네임스페이스에서 찾습니다.
+        sources:
+          - name: ${spring.application.name}
+          # 필요하다면 특정 네임스페이스를 지정하거나 여러 ConfigMap을 로드할 수 있습니다.
+          # - name: global-app-config
+          #   namespace: common-configs
+
+      # Secret 기반 프로퍼티 소스 활성화 (필요시)
+      secrets:
+        enabled: true # true로 설정해야 Secret을 읽어옵니다.
+        # sources: 읽어올 Secret 목록 정의
+        # 애플리케이션 이름에 '-secrets'가 붙은 이름의 Secret을 현재 Pod의 네임스페이스에서 찾습니다.
+        sources:
+          - name: ${spring.application.name}-secrets
+          # 필요시 fail-fast 비활성화 (Secret이 없어도 시작)
+          # fail-fast: false
+
+      # (선택 사항) 설정 변경 시 애플리케이션 자동 리로드 기능
+      # reload:
+        # enabled: true # 리로드 기능 활성화
+        # mode: event   # 이벤트 기반 리로드 (ConfigMap/Secret 변경 감지) - 권장
+        # # mode: poll    # 폴링 기반 리로드 (주기적으로 체크)
+        # # period: 15s   # 폴링 주기
+
+# 웹 서버 관련 설정
+server:
+  port: 8080 # 애플리케이션이 실행될 포트
+  shutdown: graceful # Graceful Shutdown 활성화 (애플리케이션 종료 시 요청을 안전하게 처리)
+
+# Spring Boot Actuator 엔드포인트 및 관리 기능 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        # 노출할 Actuator 엔드포인트 목록 (쉼표로 구분)
+        # health, info, prometheus는 쿠버네티스 환경에서 일반적으로 필요합니다.
+        include: "health,info,prometheus,metrics"
+        # exclude: "env,beans" # 민감하거나 불필요한 엔드포인트는 제외
+  endpoint:
+    health:
+      show-details: always # /actuator/health 호출 시 상세 정보 항상 표시 (문제 진단에 유용)
+      # 쿠버네티스 프로브 연동을 위한 설정 (Spring Boot 2.6+ 에서 기본 활성화 경향)
+      probes:
+        enabled: true
+  metrics:
+    # 모든 메트릭에 공통적으로 적용될 태그
+    tags:
+      application: ${spring.application.name} # 애플리케이션 이름을 태그로 추가
+  # OTLP (OpenTelemetry Protocol)를 통한 트레이싱 설정
+  otlp:
+    metrics:
+      export:
+        enabled: false  
+    tracing:
+      # OpenTelemetry 트레이스를 OTLP로 내보낼 엔드포인트 주소.
+      # ${...} 플레이스홀더를 사용하여 ConfigMap, 환경 변수, 또는 시스템 프로퍼티에서 값을 가져옵니다.
+      # : 뒤는 기본값으로, 해당 값을 찾을 수 없을 때 사용됩니다 (로컬 개발 시 유용).      
+      endpoint: ${OTEL_COLLECTOR_ENDPOINT:http://localhost:4318/v1/traces}
+      # headers: # 필요한 경우 인증 토큰 등 OTLP 익스포터 헤더 추가
+        # Authorization: "Bearer your-token"
+  # Micrometer Tracing 설정
+  tracing:
+    sampling:
+      # 트레이스 샘플링 비율 (1.0 = 모든 트레이스 샘플링, 프로덕션에서는 부하를 고려하여 0.01 ~ 0.1 등으로 조정)
+      probability: 1.0
+    # 전파 형식 (기본값: W3C Trace Context - 권장)
+    # propagation:
+      # type: B3 # 또는 B3_MULTI, AWS 등 다른 형식 사용 시 명시
+
+# 기본 로깅 레벨 설정 (상세한 포맷은 logback-spring.xml에서 관리)
+logging:
+  level:
+    root: INFO
+    # 개발 중인 패키지는 DEBUG 레벨로 설정하여 더 자세한 로그 확인
+    com.example.boilerplate: DEBUG # ${spring.application.group} 같은 형태로 패키지명 변경 가능
+    org.springframework.web: INFO
+    org.springframework.cloud.kubernetes: INFO # Spring Cloud Kubernetes 동작 로그 확인용
+    # org.hibernate.SQL: DEBUG # JPA/Hibernate SQL 로깅 (필요시)
